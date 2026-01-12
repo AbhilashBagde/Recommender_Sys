@@ -1,0 +1,5 @@
+- **Visual Product Search**: Users can upload images (JPG/PNG) of products like clothing or gadgets to automatically trigger a visual search across the Indian e-commerce market.
+- **Localized Market Filtering**: The system filters search results to exclusively show products available in Indian Rupees (₹) from major Indian retailers such as Amazon.in, Flipkart, Myntra, Ajio, and TataCliq.
+- **Price Comparison Engine**: An automated sorting feature that identifies the lowest prices available for the uploaded item, ensuring users can quickly find the most cost-effective deal.
+- **Top Deal Showcases**: A dedicated results area that displays the top three best deals, featuring high-quality product images, bold pricing in INR, store branding, and direct "Visit Store" navigation links.
+- **Intelligent Availability Alerts**: A feedback system that notifies users if a product cannot be found within the Indian market and provides guidance on how to improve search results with better imagery.
