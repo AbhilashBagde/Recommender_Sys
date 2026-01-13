@@ -5,7 +5,6 @@ import { searchProduct, type ProductMatch } from '@/app/actions/search';
 import { extractImageFromUrl } from '@/app/actions/scrape';
 import { getProductVibe } from '@/app/actions/gemini';
 import PriceChart from '@/components/PriceChart';
-
 import { Link as LinkIcon, Sparkles, ShieldCheck, ChevronDown, ShoppingBag, Upload, Search, Image as ImageIcon, X, Tag, Trophy, AlertCircle } from 'lucide-react';
 
 export default function Home() {
@@ -54,14 +53,20 @@ export default function Home() {
       if (!urlInput) return;
       setIsSearching(true);
       setError(null);
-      const extractedUrl = await extractImageFromUrl(urlInput);
-      if (!extractedUrl) {
-        setError('Could not find a product image at that link. Try uploading a photo instead.');
+      try {
+        const extractedUrl = await extractImageFromUrl(urlInput);
+        if (!extractedUrl) {
+          setError('Could not find a product image at that link. Try uploading a photo instead.');
+          setIsSearching(false);
+          return;
+        }
+        imageToSearch = extractedUrl;
+        isUrl = true;
+      } catch (err) {
+        setError('Failed to process the URL. Please check the link.');
         setIsSearching(false);
         return;
       }
-      imageToSearch = extractedUrl;
-      isUrl = true;
     }
 
     if (!imageToSearch) return;
@@ -83,19 +88,23 @@ export default function Home() {
   const getProcessedResults = () => {
     if (!results) return [];
     let filtered = [...results];
+    
     if (verifiedOnly) {
-      const trusted = ["amazon", "flipkart", "myntra", "ajio", "tata", "reliance"];
-      filtered = filtered.filter(r => trusted.some(kw => r.source.toLowerCase().includes(kw)));
+      filtered = filtered.filter(r => r.verified);
     }
-    // Updated sort logic for nested price object
-    return filtered.sort((a, b) => 
-      sortBy === 'price' 
-        ? a.price.amount - b.price.amount 
-        : (b.trustScore || 0) - (a.trustScore || 0)
-    );
+    
+    return filtered.sort((a, b) => {
+      if (sortBy === 'price') {
+        return a.price.amount - b.price.amount;
+      } else {
+        return (b.trustScore || 0) - (a.trustScore || 0);
+      }
+    });
   };
 
   const processedResults = getProcessedResults();
+  const topDeals = processedResults.slice(0, 3);
+  const otherDeals = processedResults.slice(3);
 
   const clearImage = () => {
     setSelectedImage(null);
@@ -256,94 +265,146 @@ export default function Home() {
         {/* Results Section */}
         {results && (
           <div className="mb-16">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
               <h3 className="text-2xl font-bold text-white">
-                Found {results.length} Deals
+                Found {processedResults.length} Deals
               </h3>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 text-sm text-slate-400">
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer hover:text-white transition-colors">
                   <input
                     type="checkbox"
                     checked={verifiedOnly}
                     onChange={(e) => setVerifiedOnly(e.target.checked)}
-                    className="rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500"
+                    className="w-4 h-4 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500"
                   />
-                  Verified Only
+                  Verified Stores Only
                 </label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'price' | 'trust')}
-                  className="bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-cyan-400"
-                >
-                  <option value="price">Sort by Price</option>
-                  <option value="trust">Sort by Trust</option>
-                </select>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-slate-400">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'price' | 'trust')}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-cyan-400 cursor-pointer"
+                  >
+                    <option value="price">Lowest Price</option>
+                    <option value="trust">Trusted Stores</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {processedResults.map((result, idx) => (
-                <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-cyan-400 transition-all group">
-                  <div className="relative mb-4">
-                    <img 
-                      src={result.thumbnail} // FIX: Changed imageUrl to thumbnail (typical SerpApi match)
-                      alt={result.title}
-                      className="w-full h-48 object-cover rounded-xl"
-                    />
-                    {result.source && ["amazon", "flipkart", "myntra"].some(s => result.source.toLowerCase().includes(s)) && (
-                      <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                        <ShieldCheck className="w-3 h-3" />
-                        Verified
-                      </div>
-                    )}
-                  </div>
-                  
-                  <h4 className="font-bold text-white mb-2 line-clamp-2">{result.title}</h4>
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      {/* --- FIX START: Correctly render Price Object --- */}
-                      <p className="text-2xl font-bold text-cyan-400">
-                        {result.price.currency === 'INR' ? '₹' : result.price.currency}
-                        {result.price.amount.toLocaleString('en-IN')}
-                      </p>
-                      {/* --- FIX END --- */}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-slate-400">{result.source}</p>
-                      {/* Optional: Add trust score display if you have it in data */}
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <a
-                      href={result.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 bg-cyan-500 text-white py-2 rounded-lg font-bold text-sm hover:bg-cyan-600 transition-colors text-center"
-                    >
-                      View Deal
-                    </a>
-                    <button
-                      onClick={() => handleVibeCheck(idx, result.title)}
-                      disabled={loadingVibe === idx}
-                      className="bg-white/10 text-white px-4 py-2 rounded-lg font-bold text-sm hover:bg-white/20 disabled:opacity-50 transition-colors"
-                    >
-                      {loadingVibe === idx ? (
-                        <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <Sparkles className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                  
-                  {vibeCheck[idx] && (
-                    <div className="mt-4 p-3 bg-white/5 rounded-lg">
-                      <p className="text-sm text-slate-300">{vibeCheck[idx]}</p>
-                    </div>
-                  )}
+            {/* Price Chart Integration */}
+            <PriceChart data={processedResults} />
+
+            {/* Top 3 Deals Showcase */}
+            {topDeals.length > 0 && (
+              <div className="mb-12">
+                <div className="flex items-center gap-2 mb-6">
+                  <Trophy className="w-6 h-6 text-yellow-400" />
+                  <h3 className="text-xl font-bold text-white uppercase tracking-wider">Best Value Matches</h3>
                 </div>
-              ))}
-            </div>
+                <div className="grid gap-6 md:grid-cols-3">
+                  {topDeals.map((result, idx) => (
+                    <div key={`top-${idx}`} className="relative bg-gradient-to-b from-cyan-500/10 to-transparent border border-cyan-500/30 rounded-3xl p-1 overflow-hidden group">
+                      <div className="absolute -top-10 -right-10 w-32 h-32 bg-cyan-500/20 blur-3xl rounded-full group-hover:bg-cyan-500/40 transition-all" />
+                      <div className="bg-[#0f172a] rounded-[1.4rem] p-5 h-full flex flex-col">
+                        <div className="relative mb-4 aspect-square overflow-hidden rounded-2xl">
+                          <img 
+                            src={result.thumbnail}
+                            alt={result.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                          <div className="absolute top-3 left-3 bg-cyan-500 text-white px-3 py-1 rounded-full text-xs font-black shadow-lg">
+                            #{idx + 1} BEST DEAL
+                          </div>
+                        </div>
+                        
+                        <h4 className="font-bold text-white mb-2 line-clamp-2 flex-1">{result.title}</h4>
+                        
+                        <div className="flex items-end justify-between mb-4">
+                          <div>
+                            <p className="text-xs text-slate-400 uppercase font-bold mb-1">{result.source}</p>
+                            <p className="text-3xl font-black text-white">
+                              {result.price.currency === 'INR' ? '₹' : result.price.currency}
+                              {result.price.amount.toLocaleString('en-IN')}
+                            </p>
+                          </div>
+                          {result.verified && (
+                            <ShieldCheck className="w-6 h-6 text-cyan-400 mb-1" />
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          <a
+                            href={result.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-full bg-cyan-500 text-white py-3 rounded-xl font-bold text-center hover:bg-cyan-600 transition-all shadow-[0_0_15px_rgba(34,211,238,0.3)]"
+                          >
+                            Visit Store
+                          </a>
+                          <button
+                            onClick={() => handleVibeCheck(idx, result.title)}
+                            disabled={loadingVibe === idx}
+                            className="w-full flex items-center justify-center gap-2 bg-white/5 text-slate-300 py-2 rounded-xl text-sm font-bold hover:bg-white/10 transition-all"
+                          >
+                            {loadingVibe === idx ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 text-cyan-400" />
+                                AI Vibe Check
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        
+                        {vibeCheck[idx] && (
+                          <div className="mt-4 p-3 bg-cyan-500/5 border border-cyan-500/10 rounded-xl">
+                            <p className="text-xs text-cyan-100 italic leading-relaxed">{vibeCheck[idx]}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Other Results Grid */}
+            {otherDeals.length > 0 && (
+              <div>
+                <h3 className="text-lg font-bold text-slate-400 mb-6 uppercase tracking-widest">More Options</h3>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                  {otherDeals.map((result, idx) => (
+                    <div key={idx + 3} className="bg-white/5 border border-white/10 rounded-2xl p-4 hover:border-white/20 transition-all group">
+                      <div className="relative mb-3 aspect-video overflow-hidden rounded-xl">
+                        <img 
+                          src={result.thumbnail}
+                          alt={result.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      </div>
+                      <h4 className="font-bold text-sm text-white mb-2 line-clamp-1">{result.title}</h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-lg font-bold text-cyan-400">
+                          ₹{result.price.amount.toLocaleString('en-IN')}
+                        </p>
+                        <span className="text-[10px] text-slate-500 font-bold uppercase">{result.source}</span>
+                      </div>
+                      <a
+                        href={result.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full bg-white/5 text-white py-2 rounded-lg font-bold text-xs text-center hover:bg-white/10 transition-colors"
+                      >
+                        View Deal
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -373,15 +434,6 @@ export default function Home() {
             <p className="text-slate-400">Shop with confidence from verified stores with high trust scores and reliable service.</p>
           </div>
         </div>
-
-
-        {/* Price Chart */}
-        {results && results.length > 0 && (
-          <div className="mb-16">
-            <h3 className="text-2xl font-bold text-white mb-8 text-center">Price Comparison</h3>
-            <PriceChart data={processedResults} />
-          </div>
-        )}
       </main>
 
       {/* Footer */}
