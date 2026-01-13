@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import "@/instrumentation-client"; // Initialize PostHog
+import "@/instrumentation-client"; // Fixed: Use absolute alias to find root file
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
