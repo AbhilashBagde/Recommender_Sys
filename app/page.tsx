@@ -5,7 +5,7 @@ import { searchProduct, type ProductMatch } from '@/app/actions/search';
 import { extractImageFromUrl } from '@/app/actions/scrape';
 import { getProductVibe } from '@/app/actions/gemini';
 import PriceChart from '@/components/PriceChart';
-import DealsCarousel from '@/components/DealsCarousel';
+
 import { Link as LinkIcon, Sparkles, ShieldCheck, ChevronDown, ShoppingBag, Upload, Search, Image as ImageIcon, X, Tag, Trophy, AlertCircle } from 'lucide-react';
 
 export default function Home() {
@@ -374,11 +374,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Deals Carousel */}
-        <div className="mb-16">
-          <h3 className="text-2xl font-bold text-white mb-8 text-center">Trending Deals</h3>
-          <DealsCarousel />
-        </div>
 
         {/* Price Chart */}
         {results && results.length > 0 && (
