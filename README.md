@@ -1,11 +1,11 @@
-# 🛍️ LensLook: AI-Powered Visual Price Intelligence
+# 🛍️ DesiDeal Hunter : AI-Powered Visual Price Intelligence
 
 [![Deploy with Vercel](https://vercel.com/button)](https://recommender-sys.vercel.app/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-Database-green)](https://supabase.com/)
 
-**Live Demo:** [https://recommender-sys.vercel.app/](https://recommender-sys.vercel.app/)
+**Live Demo:** (https://recommender-sys.vercel.app/)
 
 ## 📋 Executive Summary
 
