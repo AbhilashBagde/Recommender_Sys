@@ -71,7 +71,7 @@ export default function Home() {
     setResults(null);
 
     try {
-      const data = await searchProduct(imageToSearch, isUrl);
+      const data = await searchProduct(imageToSearch, isUrl); // Ensure searchProduct accepts the second arg if updated
       setResults(data);
     } catch (err: any) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -87,7 +87,12 @@ export default function Home() {
       const trusted = ["amazon", "flipkart", "myntra", "ajio", "tata", "reliance"];
       filtered = filtered.filter(r => trusted.some(kw => r.source.toLowerCase().includes(kw)));
     }
-    return filtered.sort((a, b) => sortBy === 'price' ? a.price.amount - b.price.amount : (b.trustScore || 0) - (a.trustScore || 0));
+    // Updated sort logic for nested price object
+    return filtered.sort((a, b) => 
+      sortBy === 'price' 
+        ? a.price.amount - b.price.amount 
+        : (b.trustScore || 0) - (a.trustScore || 0)
+    );
   };
 
   const processedResults = getProcessedResults();
@@ -281,11 +286,11 @@ export default function Home() {
                 <div key={idx} className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-cyan-400 transition-all group">
                   <div className="relative mb-4">
                     <img 
-                      src={result.imageUrl} 
+                      src={result.thumbnail} // FIX: Changed imageUrl to thumbnail (typical SerpApi match)
                       alt={result.title}
                       className="w-full h-48 object-cover rounded-xl"
                     />
-                    {result.verified && (
+                    {result.source && ["amazon", "flipkart", "myntra"].some(s => result.source.toLowerCase().includes(s)) && (
                       <div className="absolute top-2 right-2 bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                         <ShieldCheck className="w-3 h-3" />
                         Verified
@@ -296,23 +301,22 @@ export default function Home() {
                   <h4 className="font-bold text-white mb-2 line-clamp-2">{result.title}</h4>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-2xl font-bold text-cyan-400">${result.price}</p>
-                      {result.originalPrice && (
-                        <p className="text-sm text-slate-400 line-through">${result.originalPrice}</p>
-                      )}
+                      {/* --- FIX START: Correctly render Price Object --- */}
+                      <p className="text-2xl font-bold text-cyan-400">
+                        {result.price.currency === 'INR' ? '₹' : result.price.currency}
+                        {result.price.amount.toLocaleString('en-IN')}
+                      </p>
+                      {/* --- FIX END --- */}
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-slate-400">{result.store}</p>
-                      <div className="flex items-center gap-1">
-                        <Trophy className="w-4 h-4 text-yellow-400" />
-                        <span className="text-sm text-slate-400">{result.trustScore}%</span>
-                      </div>
+                      <p className="text-sm text-slate-400">{result.source}</p>
+                      {/* Optional: Add trust score display if you have it in data */}
                     </div>
                   </div>
                   
                   <div className="flex gap-2">
                     <a
-                      href={result.url}
+                      href={result.link}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-1 bg-cyan-500 text-white py-2 rounded-lg font-bold text-sm hover:bg-cyan-600 transition-colors text-center"
