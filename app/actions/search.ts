@@ -44,7 +44,7 @@ export async function searchProduct(imageBase64: string) {
     const data = await response.json();
 
     // 3. Cleanup: Delete the image from storage after search (optional, but good practice)
-    await supabase.storage.from('product_images').remove([fileName]);
+    await supabase.storage.from('product-images').remove([fileName]);
 
     return data;
   } catch (error) {
