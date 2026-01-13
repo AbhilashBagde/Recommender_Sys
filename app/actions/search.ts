@@ -4,14 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 
 const SERPAPI_API_KEY = process.env.SERPAPI_API_KEY;
 
-// Define the interface so TypeScript doesn't complain
 export interface ProductMatch {
   title: string;
   price: { amount: number; currency: string };
   thumbnail: string;
   source: string;
   link: string;
-  score?: number; // Added score for ranking
+  trustScore?: number;
 }
 
 export async function searchProduct(imageInput: string, isUrl: boolean = false): Promise<ProductMatch[]> {
@@ -22,10 +21,8 @@ export async function searchProduct(imageInput: string, isUrl: boolean = false):
     let finalImageUrl = '';
 
     if (isUrl) {
-      // If it's already a URL, we can pass it directly to SerpApi
       finalImageUrl = imageInput;
     } else {
-      // --- 1. Upload Base64 ---
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
       const base64Data = imageInput.includes('base64,') ? imageInput.split('base64,')[1] : imageInput;
       const buffer = Buffer.from(base64Data, 'base64');
@@ -43,7 +40,6 @@ export async function searchProduct(imageInput: string, isUrl: boolean = false):
       finalImageUrl = publicUrl;
     }
 
-    // --- 2. Call SerpApi ---
     const params = new URLSearchParams({
       engine: 'google_lens',
       url: finalImageUrl,
@@ -52,35 +48,32 @@ export async function searchProduct(imageInput: string, isUrl: boolean = false):
       currency: 'INR'
     });
 
-    // 🔴 BUG FIX 1: Added ".json" to get data, not HTML
     const response = await fetch(`https://serpapi.com/search.json?${params.toString()}`);
     const data = await response.json();
 
-    // --- 3. Cleanup (Only if we uploaded a file) ---
     if (!isUrl) {
       const fileName = finalImageUrl.split('/').pop();
-      if (fileName) {
-        await supabase.storage.from('product-images').remove([fileName]);
-      }
+      if (fileName) await supabase.storage.from('product-images').remove([fileName]);
     }
 
-    // 🔴 BUG FIX 2: Parse the data for the frontend
     if (!data.visual_matches) return [];
 
-    const verifiedStores = ['amazon', 'flipkart', 'myntra', 'ajio', 'tata'];
+    const trustedKeywords = ["amazon", "flipkart", "myntra", "ajio", "tata", "reliance"];
 
     const cleanResults: ProductMatch[] = data.visual_matches
-      .filter((item: any) => item.price)
+      // 🚨 BUG FIX 1: STRICT CURRENCY FILTERING
+      .filter((item: any) => {
+        const currency = item.price?.currency;
+        return currency === 'INR' || currency === '₹';
+      })
       .map((item: any) => {
         const price = item.price.extracted_value;
         const source = item.source?.toLowerCase() || '';
         
-        // Ranking Algorithm
-        let score = (10000 / (price || 1));
-        
-        // Bonus Points for Verified Stores
-        if (verifiedStores.some(store => source.includes(store))) {
-          score += 20;
+        // Feature 1: TrustRank Logic
+        let trustScore = (10000 / (price || 1));
+        if (trustedKeywords.some(kw => source.includes(kw))) {
+          trustScore += 50;
         }
 
         return {
@@ -92,13 +85,13 @@ export async function searchProduct(imageInput: string, isUrl: boolean = false):
           thumbnail: item.thumbnail,
           source: item.source,
           link: item.link,
-          score: score
+          trustScore
         };
-      });
+      })
+      // 🚨 BUG FIX 2: SORT BY PRICE (LOW TO HIGH) TO FIND BEST DEALS
+      .sort((a, b) => a.price.amount - b.price.amount);
 
-    // Sort by score descending by default
-    return cleanResults.sort((a, b) => (b.score || 0) - (a.score || 0));
-
+    return cleanResults;
   } catch (error) {
     console.error('Search error:', error);
     throw new Error('Failed to search for product');
